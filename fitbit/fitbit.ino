@@ -35,6 +35,54 @@ long lastBeat = 0; //Time at which the last beat occurred
 float beatsPerMinute;
 int beatAvg;
 
+// moving average variables
+#define QUEUE_SIZE 10
+
+// threshold for counting a step
+double UPPER_STEP_THRESH = 11.0;
+bool isBelowThresh = true;
+int n_steps = 0;
+
+// struct for moving average
+struct MovingAverage {
+  double array[QUEUE_SIZE];  
+  int currentIndex;
+  int count;                 
+  double sum;
+};
+
+// moving average helper functions
+void initializeMovingAverage(MovingAverage &ma) {
+  ma.currentIndex = 0;
+  ma.count = 0;
+  ma.sum = 0.0;
+  for (int i = 0; i < QUEUE_SIZE; ++i) {
+    ma.array[i] = 0.0;  // Initialize all elements to 0
+  }
+}
+
+double addToMovingAverage(MovingAverage& ma, double value) {
+  // If the circular array is at full capacity, subtract the oldest value from the sum
+  if (ma.count >= QUEUE_SIZE) {
+    ma.sum -= ma.array[ma.currentIndex];
+  } else {
+    // Increment the count if not at full capacity
+    ma.count++;
+  }
+  // Add the new value to the sum
+  ma.sum += value;
+  // Add the new value to the circular array and update the index (circular)
+  ma.array[ma.currentIndex] = value;
+  ma.currentIndex = (ma.currentIndex + 1) % QUEUE_SIZE;
+  // Return the updated average
+  return ma.sum / ma.count;
+}
+
+double accelMagnitude;
+double accelAvgMagnitude;
+MovingAverage accelMovingAvg;
+
+
 void setup(void) {
   Serial.begin(9600);
   Serial.println("Initializing...");
@@ -132,6 +180,9 @@ void setup(void) {
     break;
   }
 
+  // initialize moving average
+  initializeMovingAverage(accelMovingAvg);
+
   Serial.println("");
   delay(100);
 }
@@ -181,36 +232,57 @@ void loop() {
   // tft.println("Rot Y: " + String(g.gyro.x) + " m/s^2");
   // tft.println("Rot Z: " + String(g.gyro.x) + " m/s^2");
 
-  Serial.print("IR=");
-  Serial.print(irValue);
-  Serial.print(", BPM=");
-  Serial.print(beatsPerMinute);
-  Serial.print(", Avg BPM=");
-  Serial.print(beatAvg);
+  // Serial.print("IR=");
+  // Serial.print(irValue);
+  // Serial.print(", BPM=");
+  // Serial.print(beatsPerMinute);
+  // Serial.print(", Avg BPM=");
+  // Serial.print(beatAvg);
 
-  if (irValue < 50000)
-    Serial.print(" No finger?");
-  Serial.println("");
+  // if (irValue < 50000)
+    // Serial.print(" No finger?");
+  // Serial.println("");
 
-  Serial.print("Acceleration X: ");
-  Serial.print(a.acceleration.x);
-  Serial.print(", Y: ");
-  Serial.print(a.acceleration.y);
-  Serial.print(", Z: ");
-  Serial.print(a.acceleration.z);
-  Serial.println(" m/s^2");
+  // add y to moving average
+  accelMagnitude = sqrt(pow(a.acceleration.y, 2) + pow(a.acceleration.x, 2));
+  accelAvgMagnitude = addToMovingAverage(accelMovingAvg, accelMagnitude);
+  Serial.println(accelAvgMagnitude);
 
-  Serial.print("Rotation X: ");
-  Serial.print(g.gyro.x);
-  Serial.print(", Y: ");
-  Serial.print(g.gyro.y);
-  Serial.print(", Z: ");
-  Serial.print(g.gyro.z);
-  Serial.println(" rad/s");
+  if (accelAvgMagnitude < UPPER_STEP_THRESH){
+    isBelowThresh = true;
+  }
 
-  Serial.print("Temperature: ");
-  Serial.print(temp.temperature);
-  Serial.println(" degC");
+  if (accelAvgMagnitude > UPPER_STEP_THRESH && isBelowThresh == true){
+    isBelowThresh = false;
+    n_steps ++;
+    Serial.print("Number of Steps: ");
+    Serial.println(n_steps);
+  }
 
-  Serial.println("");
+  // Serial.print("Acceleration X: ");
+  // Serial.print(a.acceleration.x);
+  // Serial.print(",");s
+  // // Serial.print(", Y: ");
+  // Serial.print(a.acceleration.y);
+  // Serial.print(",");
+  // // Serial.print(", Z: ");
+  // Serial.print(a.acceleration.z);
+  // Serial.println("");
+  // Serial.println(" m/s^2");
+
+  
+
+  // Serial.print("Rotation X: ");
+  // Serial.print(g.gyro.x);
+  // Serial.print(", Y: ");
+  // Serial.print(g.gyro.y);
+  // Serial.print(", Z: ");
+  // Serial.print(g.gyro.z);
+  // Serial.println(" rad/s");
+
+  // Serial.print("Temperature: ");
+  // Serial.print(temp.temperature);
+  // Serial.println(" degC");
+
+  // Serial.println("");
 }
