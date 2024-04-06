@@ -443,7 +443,7 @@ void loop() {
   }
 
   // Determine the current activity level based on accelAvgMagnitude or step goal
-  if (n_steps > STEP_GOAL){
+  if (n_steps >= STEP_GOAL){
     currentActivity = DONE;
   } else if (accelAvgMagnitude < LOWER_ACTIVITY_THRESH) {
     currentActivity = ACTIVITY_LOW;
