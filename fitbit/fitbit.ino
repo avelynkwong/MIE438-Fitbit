@@ -14,7 +14,7 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_NeoPixel.h>
-// #include <pitches.h>
+#include "pitches.h"
 
 // Display Pins
 #define TFT_CS        7  // Not used in this setup, SPI CS is used automatically
@@ -95,7 +95,6 @@ double accelAvgMagnitude;
 MovingAverage accelMovingAvg;
 
 // Neopixel statemachine
-
 #define LOWER_ACTIVITY_THRESH 5
 #define UPPER_ACTIVITY_THRESH 14
 
@@ -111,6 +110,22 @@ void pulseBlueLight() {
 
   for(int i=0; i<NUMPIXELS; i++) {
     pixels.setPixelColor(i, pixels.Color(0, 0, brightness));
+  }
+  pixels.show();
+
+  brightness += fadeAmount;
+  if (brightness <= 0 || brightness >= 255) {
+    fadeAmount = -fadeAmount; // reverse direction
+  }
+  delay(30);
+}
+
+void pulseRedLight() {
+  static uint8_t brightness = 0;
+  static int fadeAmount = 5;
+
+  for(int i=0; i<NUMPIXELS; i++) {
+    pixels.setPixelColor(i, pixels.Color(brightness, 0, 0));
   }
   pixels.show();
 
@@ -152,53 +167,49 @@ void pulseGreenLight() {
   }
   delay(30);
 }
-// void fixedColor() {
-//   static uint8_t startPixel = 0;
-//   pixels.clear(); // Clear all pixels to start
-
-//   uint32_t fixedColor = pixels.Color(0, 255, 0); 
-
-//   pixels.setPixelColor(startPixel, fixedColor);
-//   pixels.show();
-
-//   startPixel = (startPixel + 1) % NUMPIXELS;
-
-//   delay(10);
-// }
-
-// Function to generate color
-// uint32_t Wheel(byte WheelPos) {
-//   WheelPos = 255 - WheelPos;
-//   if(WheelPos < 85) {
-//     return pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-//   }
-//   if(WheelPos < 170) {
-//     WheelPos -= 85;
-//     return pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-//   }
-//   WheelPos -= 170;
-//   return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-// }
-
-// void rapidSparkle() {
-//   static unsigned long lastUpdate = 0;
-//   unsigned long now = millis();
-  
-//   if (now - lastUpdate > 50) { // Increase frequency of updates
-//     lastUpdate = now;
-    
-//     if (random(10) > 5) { // Randomly decide whether to clear pixels or not
-//       pixels.clear();
-//     }
-    
-//     // Use a fixed color (red) for the sparkle
-//     pixels.setPixelColor(random(NUMPIXELS), pixels.Color(255, 255, 255));
-//     pixels.show();
-//   }
-// }
-
 
 ActivityLevel currentActivity = ACTIVITY_LOW;
+
+// sounds setup
+int notif_sound[] = {
+  NOTE_C4,
+  NOTE_E4,
+  NOTE_G4,
+  END
+};
+int notif_durations[] = { 
+  4, 4, 8
+};
+
+int goal_complete[] = {
+  NOTE_C5,
+  NOTE_E5,
+  NOTE_G5,
+  NOTE_C6,
+  NOTE_G5,
+  NOTE_E5,
+  NOTE_C5,
+  NOTE_E5,
+  NOTE_G5,
+  NOTE_C6,
+  NOTE_G5,
+  NOTE_E5,
+  NOTE_C5,
+  NOTE_D5,
+  NOTE_B4,
+  NOTE_C5
+};
+int goal_complete_durations[] = {
+  4, 4, 4, 4, 4, 4, 4, 4,
+  4, 4, 4, 4, 4, 4, 4, 8
+};
+
+int note_speed=90;
+
+#define STEP_GOAL 20
+#define CHIME_EVERY 10
+#define SPEAKER_PIN 11
+int lastPlayed = 0; // keeps track of the number of steps at which the sound was last played
 
 void setup(void) {
   Serial.begin(9600);
@@ -323,6 +334,7 @@ void loop() {
 
   long irValue = particleSensor.getIR();
 
+  // 3 successive loops to update bpm faster
   int count = 0;
   while (count < 2){
       if (checkForBeat(irValue) == true) {
@@ -357,11 +369,11 @@ void loop() {
   // Serial.println();
 
   /* Print out the values */
-  Serial.print("IR=");
-  Serial.print(irValue);
-  Serial.print(", BPM=");
-  Serial.print(beatsPerMinute);
-  Serial.println("");
+  // Serial.print("IR=");
+  // Serial.print(irValue);
+  // Serial.print(", BPM=");
+  // Serial.print(beatsPerMinute);
+  // Serial.println("");
   
   // Fill display with black
   tft.fillScreen(ST77XX_BLACK);
@@ -395,7 +407,7 @@ void loop() {
   // add y to moving average
   accelMagnitude = sqrt(pow(a.acceleration.y, 2) + pow(a.acceleration.x, 2));
   accelAvgMagnitude = addToMovingAverage(accelMovingAvg, accelMagnitude);
-  Serial.println(accelAvgMagnitude);
+  // Serial.println(accelAvgMagnitude);
 
   if (accelAvgMagnitude < UPPER_STEP_THRESH){
     isBelowThresh = true;
@@ -408,6 +420,26 @@ void loop() {
     Serial.println(n_steps);
   }
 
+  if (n_steps == STEP_GOAL && n_steps != lastPlayed){
+    Serial.println("Goal reached!");
+    for (int currNote = 0; goal_complete[currNote]!=-1; currNote++) {
+      int noteDuration = note_speed*goal_complete_durations[currNote];
+      tone(SPEAKER_PIN, goal_complete[currNote],noteDuration*.95);
+      delay(noteDuration);
+      noTone(SPEAKER_PIN);
+    }
+    lastPlayed = n_steps; // update lastplayed to avoid repeated chimes
+  }
+  else if (n_steps>0 && n_steps % CHIME_EVERY == 0 && n_steps != lastPlayed){
+    Serial.println("Playing sound");
+    for (int currNote = 0; notif_sound[currNote]!=-1; currNote++) {
+      int noteDuration = note_speed*notif_durations[currNote];
+      tone(SPEAKER_PIN, notif_sound[currNote],noteDuration*.95);
+      delay(noteDuration);
+      noTone(SPEAKER_PIN);
+    }
+    lastPlayed = n_steps; // update lastplayed to avoid repeated chimes
+  }
 
   // Determine the current activity level based on accelAvgMagnitude
   if (accelAvgMagnitude < LOWER_ACTIVITY_THRESH) {
