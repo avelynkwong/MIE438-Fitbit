@@ -198,7 +198,8 @@ int goal_complete[] = {
   NOTE_C5,
   NOTE_D5,
   NOTE_B4,
-  NOTE_C5
+  NOTE_C5,
+  END
 };
 int goal_complete_durations[] = {
   4, 4, 4, 4, 4, 4, 4, 4,
