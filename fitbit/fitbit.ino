@@ -10,9 +10,11 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
+#include "Adafruit_MAX1704X.h"
 #include <SPI.h>
 #include <Wire.h>
-#include pitches.h
+#include <Adafruit_NeoPixel.h>
+// #include <pitches.h>
 
 // Display Pins
 #define TFT_CS        7  // Not used in this setup, SPI CS is used automatically
@@ -21,10 +23,19 @@
 #define TFT_I2C_POWER 21  // Power control pin for the TFT display
 #define TFT_BACKLIGHT 45
 
+#define PIN 33 // On Trinket or Gemma, suggest changing this to 1
+
+// How many NeoPixels are attached to the Arduino?
+#define NUMPIXELS 16 // Popular NeoPixel ring size
+
 // Initialize Adafruit ST7789 (Display)
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RESET);
 
-// Initialize MAX30102 (Heart Rate Sensor) and MPU6050 (IMU)
+// Neopixel init
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+
+// Initialize MAX30102 (Heart Rate Sensor) and MPU6050 (IMU) and  MAX17048 (Battery)
+Adafruit_MAX17048 maxlipo;
 Adafruit_MPU6050 mpu;
 MAX30105 particleSensor;
 
@@ -83,12 +94,120 @@ double accelMagnitude;
 double accelAvgMagnitude;
 MovingAverage accelMovingAvg;
 
+// Neopixel statemachine
+
+#define LOWER_ACTIVITY_THRESH 5
+#define UPPER_ACTIVITY_THRESH 14
+
+enum ActivityLevel {
+  ACTIVITY_LOW,
+  MODERATE,
+  ACTIVITY_HIGH
+};
+
+void pulseBlueLight() {
+  static uint8_t brightness = 0;
+  static int fadeAmount = 5;
+
+  for(int i=0; i<NUMPIXELS; i++) {
+    pixels.setPixelColor(i, pixels.Color(0, 0, brightness));
+  }
+  pixels.show();
+
+  brightness += fadeAmount;
+  if (brightness <= 0 || brightness >= 255) {
+    fadeAmount = -fadeAmount; // reverse direction
+  }
+  delay(30);
+}
+
+void pulsePurpleLight() {
+  static uint8_t brightness = 0;
+  static int fadeAmount = 5;
+
+  for(int i=0; i<NUMPIXELS; i++) {
+    pixels.setPixelColor(i, pixels.Color(brightness, 0, brightness));
+  }
+  pixels.show();
+
+  brightness += fadeAmount;
+  if (brightness <= 0 || brightness >= 255) {
+    fadeAmount = -fadeAmount; // reverse direction
+  }
+  delay(30);
+}
+
+void pulseGreenLight() {
+  static uint8_t brightness = 0;
+  static int fadeAmount = 5;
+
+  for(int i=0; i<NUMPIXELS; i++) {
+    pixels.setPixelColor(i, pixels.Color(0, brightness, 0));
+  }
+  pixels.show();
+
+  brightness += fadeAmount;
+  if (brightness <= 0 || brightness >= 255) {
+    fadeAmount = -fadeAmount; // reverse direction
+  }
+  delay(30);
+}
+// void fixedColor() {
+//   static uint8_t startPixel = 0;
+//   pixels.clear(); // Clear all pixels to start
+
+//   uint32_t fixedColor = pixels.Color(0, 255, 0); 
+
+//   pixels.setPixelColor(startPixel, fixedColor);
+//   pixels.show();
+
+//   startPixel = (startPixel + 1) % NUMPIXELS;
+
+//   delay(10);
+// }
+
+// Function to generate color
+// uint32_t Wheel(byte WheelPos) {
+//   WheelPos = 255 - WheelPos;
+//   if(WheelPos < 85) {
+//     return pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+//   }
+//   if(WheelPos < 170) {
+//     WheelPos -= 85;
+//     return pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+//   }
+//   WheelPos -= 170;
+//   return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+// }
+
+// void rapidSparkle() {
+//   static unsigned long lastUpdate = 0;
+//   unsigned long now = millis();
+  
+//   if (now - lastUpdate > 50) { // Increase frequency of updates
+//     lastUpdate = now;
+    
+//     if (random(10) > 5) { // Randomly decide whether to clear pixels or not
+//       pixels.clear();
+//     }
+    
+//     // Use a fixed color (red) for the sparkle
+//     pixels.setPixelColor(random(NUMPIXELS), pixels.Color(255, 255, 255));
+//     pixels.show();
+//   }
+// }
+
+
+ActivityLevel currentActivity = ACTIVITY_LOW;
 
 void setup(void) {
   Serial.begin(9600);
   Serial.println("Initializing...");
   while (!Serial)
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
+
+  // Begin Neopixel
+  pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
   
   // Initialize display power
   pinMode(TFT_I2C_POWER, OUTPUT);
@@ -100,6 +219,14 @@ void setup(void) {
   tft.init(135, 240); // Initialize display with its resolution
   tft.setRotation(1); // Set the rotation as needed
   tft.fillScreen(ST77XX_BLACK); // Clear display to black
+
+  while (!maxlipo.begin()) {
+    Serial.println(F("Couldnt find Adafruit MAX17048?\nMake sure a battery is plugged in!"));
+    delay(2000);
+  }
+  Serial.print(F("Found MAX17048"));
+  Serial.print(F(" with Chip ID: 0x")); 
+  Serial.println(maxlipo.getChipID(), HEX);
 
   // Initialize IMU
   if (!mpu.begin()) {
@@ -219,6 +346,16 @@ void loop() {
     count ++;
   }
 
+  float cellVoltage = maxlipo.cellVoltage();
+  if (isnan(cellVoltage)) {
+    Serial.println("Failed to read cell voltage, check battery is connected!");
+    delay(2000);
+    return;
+  }
+  // Serial.print(F("Batt Voltage: ")); Serial.print(cellVoltage, 3); Serial.println(" V");
+  // Serial.print(F("Batt Percent: ")); Serial.print(maxlipo.cellPercent(), 1); Serial.println(" %");
+  // Serial.println();
+
   /* Print out the values */
   Serial.print("IR=");
   Serial.print(irValue);
@@ -237,6 +374,9 @@ void loop() {
   tft.println("BPM: " + String(beatsPerMinute));
   tft.println("Avg BPM: " + String(beatAvg));
   tft.println("Number of Steps: " + String(n_steps));
+  tft.println("Batt Voltage:" + String(maxlipo.cellVoltage(), 3) + " V");
+  tft.println("Batt Percent:" + String(maxlipo.cellPercent(), 1) + " %");
+
   // tft.println("IR: " + String(irValue));
   // tft.println("Accel X: " + String(a.acceleration.x) + " m/s^2");
   // tft.println("Accel Y: " + String(a.acceleration.y) + " m/s^2");
@@ -268,6 +408,29 @@ void loop() {
     Serial.println(n_steps);
   }
 
+
+  // Determine the current activity level based on accelAvgMagnitude
+  if (accelAvgMagnitude < LOWER_ACTIVITY_THRESH) {
+    currentActivity = ACTIVITY_LOW;
+  } else if (accelAvgMagnitude >= LOWER_ACTIVITY_THRESH && accelAvgMagnitude < UPPER_ACTIVITY_THRESH) {
+    currentActivity = MODERATE;
+  } else if (accelAvgMagnitude >= UPPER_ACTIVITY_THRESH) {
+    currentActivity = ACTIVITY_HIGH;
+  }
+
+    // Update NeoPixel effects based on the current activity level (state machine)
+  switch (currentActivity) {
+    case ACTIVITY_LOW:
+      pulseBlueLight();
+      break;
+    case MODERATE:
+      pulsePurpleLight();
+      break;
+    case ACTIVITY_HIGH:
+      pulseGreenLight();
+      break;
+  }
+  
   // Serial.print("Acceleration X: ");
   // Serial.print(a.acceleration.x);
   // Serial.print(",");s
@@ -278,8 +441,6 @@ void loop() {
   // Serial.print(a.acceleration.z);
   // Serial.println("");
   // Serial.println(" m/s^2");
-
-  
 
   // Serial.print("Rotation X: ");
   // Serial.print(g.gyro.x);
