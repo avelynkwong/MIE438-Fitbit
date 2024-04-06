@@ -99,6 +99,7 @@ MovingAverage accelMovingAvg;
 #define UPPER_ACTIVITY_THRESH 14
 
 enum ActivityLevel {
+  DONE,
   ACTIVITY_LOW,
   MODERATE,
   ACTIVITY_HIGH
@@ -441,8 +442,10 @@ void loop() {
     lastPlayed = n_steps; // update lastplayed to avoid repeated chimes
   }
 
-  // Determine the current activity level based on accelAvgMagnitude
-  if (accelAvgMagnitude < LOWER_ACTIVITY_THRESH) {
+  // Determine the current activity level based on accelAvgMagnitude or step goal
+  if (n_steps > STEP_GOAL){
+    currentActivity = DONE;
+  } else if (accelAvgMagnitude < LOWER_ACTIVITY_THRESH) {
     currentActivity = ACTIVITY_LOW;
   } else if (accelAvgMagnitude >= LOWER_ACTIVITY_THRESH && accelAvgMagnitude < UPPER_ACTIVITY_THRESH) {
     currentActivity = MODERATE;
@@ -450,15 +453,18 @@ void loop() {
     currentActivity = ACTIVITY_HIGH;
   }
 
-    // Update NeoPixel effects based on the current activity level (state machine)
+  // Update NeoPixel effects based on the current activity level (state machine)
   switch (currentActivity) {
     case ACTIVITY_LOW:
-      pulseBlueLight();
+      pulseRedLight();
       break;
     case MODERATE:
       pulsePurpleLight();
       break;
     case ACTIVITY_HIGH:
+      pulseBlueLight();
+      break;
+    case DONE:
       pulseGreenLight();
       break;
   }
