@@ -213,40 +213,6 @@ int note_speed=90;
 #define SPEAKER_PIN 11
 int lastPlayed = 0; // keeps track of the number of steps at which the sound was last played
 
-const uint8_t heartBitmap[] PROGMEM = {
-  0b00000000, //      
-  0b00000000, //    
-  0b01100110, //
-  0b11111111, //
-  0b11111111, //
-  0b01111110, //
-  0b00111100, // 
-  0b00011000  //   
-};
-
-const uint8_t stepBitmap[] PROGMEM = {
-  0b00000000, //      
-  0b00111000, //    
-  0b00111111, // 
-  0b00111111, //
-  0b00000000, //
-  0b00111000, // 
-  0b00111111, //  
-  0b00111111
-};
-
-
-const uint8_t batteryBitmap[] PROGMEM = {
-  0b00000000, //      
-  0b00000000, //    
-  0b00111100, // 
-  0b11111111, //
-  0b11111111, //
-  0b11111111, //
-  0b11111111, //  
-  0b11111111
-};
-
 void setup(void) {
   Serial.begin(9600);
   Serial.println("Initializing...");
@@ -423,21 +389,20 @@ void loop() {
   tft.print("BPM:"); 
   tft.setTextColor(ST77XX_WHITE);  
   tft.println(String((int)round(beatsPerMinute)));
-  tft.drawBitmap(140, 30, heartBitmap, 8, 8, ST77XX_RED);
 
   // Steps label and value
   tft.setTextColor(ST77XX_CYAN);
   tft.print("Steps:");
   tft.setTextColor(ST77XX_WHITE);
   tft.println(String(n_steps));
-  tft.drawBitmap(135, 70, stepBitmap, 8, 8, ST77XX_CYAN);
 
   // Battery label and value
+  tft.setTextSize(2);
+  tft.println("");
   tft.setTextColor(ST77XX_GREEN);
-  tft.print(" ");
+  tft.print("Battery:");
   tft.setTextColor(ST77XX_WHITE);
   tft.println(String(maxlipo.cellPercent(), 0) + "%");
-  tft.drawBitmap(30, 100, batteryBitmap, 8, 8, ST77XX_GREEN);
 
   // tft.println("Avg BPM: " + String(beatAvg));
   // tft.println("Batt Voltage:" + String(maxlipo.cellVoltage(), 3) + " V");
