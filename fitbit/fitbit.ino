@@ -197,6 +197,40 @@ void pulseGreenLight() {
 //   }
 // }
 
+const uint8_t heartBitmap[] PROGMEM = {
+  0b00000000, //      
+  0b00000000, //    
+  0b01100110, //
+  0b11111111, //
+  0b11111111, //
+  0b01111110, //
+  0b00111100, // 
+  0b00011000  //   
+};
+
+const uint8_t stepBitmap[] PROGMEM = {
+  0b00000000, //      
+  0b00111000, //    
+  0b00111111, // 
+  0b00111111, //
+  0b00000000, //
+  0b00111000, // 
+  0b00111111, //  
+  0b00111111
+};
+
+
+const uint8_t batteryBitmap[] PROGMEM = {
+  0b00000000, //      
+  0b00000000, //    
+  0b00111100, // 
+  0b11111111, //
+  0b11111111, //
+  0b11111111, //
+  0b11111111, //  
+  0b11111111
+};
+
 
 ActivityLevel currentActivity = ACTIVITY_LOW;
 
@@ -366,16 +400,33 @@ void loop() {
   // Fill display with black
   tft.fillScreen(ST77XX_BLACK);
 
-  // Setting up text properties
-  tft.setCursor(0, 0);
+  // Initial cursor setup for the first line
+  tft.setCursor(0, 20);
+  tft.setTextSize(4);
+
+  // BPM label and value
+  tft.setTextColor(ST77XX_RED); 
+  tft.print("BPM:"); 
   tft.setTextColor(ST77XX_WHITE);  
-  tft.setTextSize(2);
-  
-  tft.println("BPM: " + String(beatsPerMinute));
-  tft.println("Avg BPM: " + String(beatAvg));
-  tft.println("Number of Steps: " + String(n_steps));
-  tft.println("Batt Voltage:" + String(maxlipo.cellVoltage(), 3) + " V");
-  tft.println("Batt Percent:" + String(maxlipo.cellPercent(), 1) + " %");
+  tft.println(String((int)round(beatsPerMinute)));
+  tft.drawBitmap(120, 30, heartBitmap, 8, 8, ST77XX_RED);
+
+  // Steps label and value
+  tft.setTextColor(ST77XX_CYAN);
+  tft.print("Steps:");
+  tft.setTextColor(ST77XX_WHITE);
+  tft.println(String(n_steps));
+  tft.drawBitmap(135, 70, stepBitmap, 8, 8, ST77XX_CYAN);
+
+  // Battery label and value
+  tft.setTextColor(ST77XX_GREEN);
+  tft.print("  ");
+  tft.setTextColor(ST77XX_WHITE);
+  tft.println(String(maxlipo.cellPercent(), 0) + "%");
+  tft.drawBitmap(30, 100, batteryBitmap, 8, 8, ST77XX_GREEN);
+
+  // tft.println("Avg BPM: " + String(beatAvg));
+  // tft.println("Batt Voltage:" + String(maxlipo.cellVoltage(), 3) + " V");
 
   // tft.println("IR: " + String(irValue));
   // tft.println("Accel X: " + String(a.acceleration.x) + " m/s^2");
@@ -436,6 +487,7 @@ void loop() {
   // Serial.print(",");s
   // // Serial.print(", Y: ");
   // Serial.print(a.acceleration.y);
+  
   // Serial.print(",");
   // // Serial.print(", Z: ");
   // Serial.print(a.acceleration.z);
