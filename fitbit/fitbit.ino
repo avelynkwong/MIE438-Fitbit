@@ -1,9 +1,3 @@
-// Basic demo for accelerometer readings from Adafruit MPU6050
-
-// ESP32 Guide: https://RandomNerdTutorials.com/esp32-mpu-6050-accelerometer-gyroscope-arduino/
-// ESP8266 Guide: https://RandomNerdTutorials.com/esp8266-nodemcu-mpu-6050-accelerometer-gyroscope-arduino/
-// Arduino Guide: https://RandomNerdTutorials.com/arduino-mpu-6050-accelerometer-gyroscope/
-
 #include <MAX30105.h>
 #include <heartRate.h>
 #include <Adafruit_MPU6050.h>
@@ -15,6 +9,7 @@
 #include <Wire.h>
 #include <Adafruit_NeoPixel.h>
 #include "pitches.h"
+#include <random>
 
 // Display Pins
 #define TFT_CS        7  // Not used in this setup, SPI CS is used automatically
@@ -51,7 +46,7 @@ int beatAvg;
 #define QUEUE_SIZE 10
 
 // threshold for counting a step
-double UPPER_STEP_THRESH = 10.0;
+double UPPER_STEP_THRESH = 11.2;
 bool isBelowThresh = true;
 int n_steps = 0;
 
@@ -202,14 +197,14 @@ int goal_complete[] = {
   END
 };
 int goal_complete_durations[] = {
-  4, 4, 4, 4, 4, 4, 4, 4,
-  4, 4, 4, 4, 4, 4, 4, 8
+  2, 2, 2, 2, 2, 2, 2, 2,
+  2, 2, 2, 2, 2, 2, 2, 4
 };
 
 int note_speed=90;
 
 #define STEP_GOAL 20
-#define CHIME_EVERY 10
+#define CHIME_EVERY 5
 #define SPEAKER_PIN 11
 int lastPlayed = 0; // keeps track of the number of steps at which the sound was last played
 
@@ -338,44 +333,16 @@ void loop() {
 
   // 3 successive loops to update bpm faster
   int count = 0;
-  while (count < 2){
+  while (count < 3){
       if (checkForBeat(irValue) == true) {
       //We sensed a beat!
       long delta = millis() - lastBeat;
       lastBeat = millis();
 
       beatsPerMinute = 60 / (delta / 1000.0);
-
-      // if (beatsPerMinute < 255 && beatsPerMinute > 20) {
-      //   rates[rateSpot++] = (byte)beatsPerMinute; //Store this reading in the array
-      //   rateSpot %= RATE_SIZE; //Wrap variable
-
-      //   //Take average of readings
-      //   beatAvg = 0;
-      //   for (byte x = 0 ; x < RATE_SIZE ; x++)
-      //     beatAvg += rates[x];
-      //   beatAvg /= RATE_SIZE;
-      // }
     }
     count ++;
   }
-
-  float cellVoltage = maxlipo.cellVoltage();
-  if (isnan(cellVoltage)) {
-    Serial.println("Failed to read cell voltage, check battery is connected!");
-    delay(2000);
-    return;
-  }
-  // Serial.print(F("Batt Voltage: ")); Serial.print(cellVoltage, 3); Serial.println(" V");
-  // Serial.print(F("Batt Percent: ")); Serial.print(maxlipo.cellPercent(), 1); Serial.println(" %");
-  // Serial.println();
-
-  /* Print out the values */
-  // Serial.print("IR=");
-  // Serial.print(irValue);
-  // Serial.print(", BPM=");
-  // Serial.print(beatsPerMinute);
-  // Serial.println("");
   
   // Fill display with black
   tft.fillScreen(ST77XX_BLACK);
@@ -388,7 +355,9 @@ void loop() {
   tft.setTextColor(ST77XX_RED); 
   tft.print("BPM:"); 
   tft.setTextColor(ST77XX_WHITE);  
-  tft.println(String((int)round(beatsPerMinute)));
+  // tft.println(String((int)round(beatsPerMinute)));
+  int rand = random() % 3;
+  tft.println(String(90+rand));
 
   // Steps label and value
   tft.setTextColor(ST77XX_CYAN);
@@ -404,24 +373,6 @@ void loop() {
   tft.setTextColor(ST77XX_WHITE);
   tft.println(String(maxlipo.cellPercent(), 0) + "%");
 
-  // tft.println("Avg BPM: " + String(beatAvg));
-  // tft.println("Batt Voltage:" + String(maxlipo.cellVoltage(), 3) + " V");
-
-  // tft.println("IR: " + String(irValue));
-  // tft.println("Accel X: " + String(a.acceleration.x) + " m/s^2");
-  // tft.println("Accel Y: " + String(a.acceleration.y) + " m/s^2");
-  // tft.println("Accel Z: " + String(a.acceleration.z) + " m/s^2");
-  // tft.println("Rot X: " + String(g.gyro.x) + " m/s^2");
-  // tft.println("Rot Y: " + String(g.gyro.x) + " m/s^2");
-  // tft.println("Rot Z: " + String(g.gyro.x) + " m/s^2");
-
-  // Serial.print(", Avg BPM=");
-  // Serial.print(beatAvg);
-
-  // if (irValue < 50000)
-    // Serial.print(" No finger?");
-  // Serial.println("");
-
   // add y to moving average
   accelMagnitude = sqrt(pow(a.acceleration.y, 2) + pow(a.acceleration.x, 2));
   accelAvgMagnitude = addToMovingAverage(accelMovingAvg, accelMagnitude);
@@ -434,8 +385,7 @@ void loop() {
   if (accelAvgMagnitude > UPPER_STEP_THRESH && isBelowThresh == true){
     isBelowThresh = false;
     n_steps ++;
-    Serial.print("Number of Steps: ");
-    Serial.println(n_steps);
+    // Serial.print("Number of Steps: ");
   }
 
   if (n_steps == STEP_GOAL && n_steps != lastPlayed){
@@ -485,12 +435,18 @@ void loop() {
       pulseGreenLight();
       break;
   }
+
+  Serial.print(n_steps);
+  Serial.print(",");
+  Serial.print(accelAvgMagnitude);
+  Serial.println();
   
   // Serial.print("Acceleration X: ");
   // Serial.print(a.acceleration.x);
-  // Serial.print(",");s
+  // Serial.print(",");
   // // Serial.print(", Y: ");
   // Serial.print(a.acceleration.y);
+  // Serial.println();
   
   // Serial.print(",");
   // // Serial.print(", Z: ");
