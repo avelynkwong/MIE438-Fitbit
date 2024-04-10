@@ -355,9 +355,7 @@ void loop() {
   tft.setTextColor(ST77XX_RED); 
   tft.print("BPM:"); 
   tft.setTextColor(ST77XX_WHITE);  
-  // tft.println(String((int)round(beatsPerMinute)));
-  int rand = random() % 3;
-  tft.println(String(90+rand));
+  tft.println(String((int)round(beatsPerMinute)));
 
   // Steps label and value
   tft.setTextColor(ST77XX_CYAN);
