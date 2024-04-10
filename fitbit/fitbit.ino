@@ -438,32 +438,4 @@ void loop() {
   Serial.print(",");
   Serial.print(accelAvgMagnitude);
   Serial.println();
-  
-  // Serial.print("Acceleration X: ");
-  // Serial.print(a.acceleration.x);
-  // Serial.print(",");
-  // // Serial.print(", Y: ");
-  // Serial.print(a.acceleration.y);
-  // Serial.println();
-  
-  // Serial.print(",");
-  // // Serial.print(", Z: ");
-  // Serial.print(a.acceleration.z);
-  // Serial.println("");
-  // Serial.println(" m/s^2");
-
-  // Serial.print("Rotation X: ");
-  // Serial.print(g.gyro.x);
-  // Serial.print(", Y: ");
-  // Serial.print(g.gyro.y);
-  // Serial.print(", Z: ");
-  // Serial.print(g.gyro.z);
-  // Serial.println(" rad/s");
-
-  // Serial.print("Temperature: ");
-  // Serial.print(temp.temperature);
-  // Serial.println(" degC");
-
-  // Serial.println("");
-  // delay(50);
 }
